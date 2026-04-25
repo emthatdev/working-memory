@@ -20,52 +20,63 @@ class MemoryController extends Controller
 
     public function store(StoreMemoryRequest $request): JsonResponse
     {
-        $type = $request->input('type');
+        $type     = $request->input('type');
+        $filePath = null;
 
-        $memory = Memory::create([
-            'user_id'   => $request->user()->id,
-            'type'      => $type,
-            'content'   => $type === 'text' ? $request->input('content') : null,
-            'file_path' => null,
-        ]);
-
+        // 1. Store file and extract text — no DB writes yet
         $extractedText = match ($type) {
             'text'  => $request->input('content'),
-            'image' => $this->extractFromImage($request, $memory),
-            'pdf'   => $this->extractFromPdf($request, $memory),
+            'image' => $this->storeAndExtractImage($request, $filePath),
+            'pdf'   => $this->storeAndExtractPdf($request, $filePath),
         };
 
-        $embedding = $this->gemini->embed($extractedText);
+        // 2. Generate embedding before touching the DB; clean up file on failure
+        try {
+            $embedding = $this->gemini->embed($extractedText);
+        } catch (\Throwable $e) {
+            if ($filePath) {
+                Storage::disk('local')->delete($filePath);
+            }
+            throw $e;
+        }
 
-        DB::statement(
-            'UPDATE memories SET embedding = ?::vector WHERE id = ?',
-            [json_encode($embedding), $memory->id]
-        );
+        // 3. Persist atomically — record creation + embedding in one transaction
+        $memory = DB::transaction(function () use ($request, $type, $filePath, $embedding) {
+            $memory = Memory::create([
+                'user_id'   => $request->user()->id,
+                'type'      => $type,
+                'content'   => $type === 'text' ? $request->input('content') : null,
+                'file_path' => $filePath,
+            ]);
 
-        return response()->json($memory->fresh(), 201);
+            DB::statement(
+                'UPDATE memories SET embedding = ?::vector WHERE id = ?',
+                [json_encode($embedding), $memory->id]
+            );
+
+            return $memory->fresh();
+        });
+
+        return response()->json($memory, 201);
     }
 
-    private function extractFromImage(StoreMemoryRequest $request, Memory $memory): string
+    private function storeAndExtractImage(StoreMemoryRequest $request, ?string &$filePath): string
     {
         $file     = $request->file('file');
-        $path     = $file->store('memories/images', 'local');
+        $filePath = $file->store('memories/images', 'local');
         $mimeType = $file->getMimeType();
-        $base64   = base64_encode(Storage::disk('local')->get($path));
-
-        $memory->update(['file_path' => $path]);
+        $base64   = base64_encode(Storage::disk('local')->get($filePath));
 
         return $this->claude->extractTextFromImage($base64, $mimeType);
     }
 
-    private function extractFromPdf(StoreMemoryRequest $request, Memory $memory): string
+    private function storeAndExtractPdf(StoreMemoryRequest $request, ?string &$filePath): string
     {
-        $file = $request->file('file');
-        $path = $file->store('memories/pdfs', 'local');
+        $file     = $request->file('file');
+        $filePath = $file->store('memories/pdfs', 'local');
 
-        $memory->update(['file_path' => $path]);
-
-        $parser   = new PdfParser();
-        $pdf      = $parser->parseFile(Storage::disk('local')->path($path));
+        $parser = new PdfParser();
+        $pdf    = $parser->parseFile(Storage::disk('local')->path($filePath));
 
         return $pdf->getText();
     }
