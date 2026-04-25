@@ -9,7 +9,7 @@ export const useApi = () => {
     const { multipart, ...fetchOptions } = options
     const headers: Record<string, string> = {
       Accept: 'application/json',
-      ...(auth.token.value ? { Authorization: `Bearer ${auth.token.value}` } : {}),
+      ...(auth.token ? { Authorization: `Bearer ${auth.token}` } : {}),
       ...(fetchOptions.headers as Record<string, string> ?? {}),
     }
     if (!multipart) headers['Content-Type'] = 'application/json'
