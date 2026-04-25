@@ -17,13 +17,14 @@ class GeminiService
 
     public function embed(string $text): array
     {
-        $response = $this->client->post('/v1beta/models/text-embedding-004:embedContent', [
+        $response = $this->client->post('/v1beta/models/gemini-embedding-001:embedContent', [
             'query' => ['key' => config('services.gemini.key')],
             'json'  => [
-                'model'   => 'models/text-embedding-004',
-                'content' => [
+                'model'              => 'models/gemini-embedding-001',
+                'content'            => [
                     'parts' => [['text' => $text]],
                 ],
+                'outputDimensionality' => 768,
             ],
         ]);
 
