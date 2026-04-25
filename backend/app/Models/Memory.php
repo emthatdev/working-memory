@@ -17,7 +17,7 @@ class Memory extends Model
         return $this->belongsTo(User::class);
     }
 
-    public static function semanticSearch(int $userId, array $embedding, int $limit = 5, float $threshold = 0.6): array
+    public static function semanticSearch(int $userId, array $embedding, int $limit = 5, float $threshold = 0.4): array
     {
         $vectorLiteral = json_encode(array_map('floatval', $embedding));
 
