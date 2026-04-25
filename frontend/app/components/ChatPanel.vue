@@ -59,18 +59,16 @@ async function send() {
   loading.value = true
   await nextTick(() => scrollBottom())
 
-  try {
-    const res = await request<{ message: string }>('/chat', {
-      method: 'POST',
-      body: { message: text },
-    })
-    messages.value.push({ role: 'assistant', content: res.message })
-  } catch {
-    messages.value.push({ role: 'assistant', content: 'Sorry, something went wrong.' })
-  } finally {
-    loading.value = false
-    await nextTick(() => scrollBottom())
-  }
+  const res = await request<{ message: string }>('/chat', {
+    method: 'POST',
+    body: { message: text },
+  })
+  messages.value.push({
+    role: 'assistant',
+    content: res.success && res.data ? res.data.message : 'Sorry, something went wrong.',
+  })
+  loading.value = false
+  await nextTick(() => scrollBottom())
 }
 
 function scrollBottom() {

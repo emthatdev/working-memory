@@ -47,17 +47,16 @@ watch(() => props.open, (v) => { if (v) { content.value = ''; error.value = '' }
 async function submit() {
   error.value = ''
   loading.value = true
-  try {
-    const memory = await request('/memories', {
-      method: 'POST',
-      body: { type: 'text', content: content.value },
-    })
-    emit('saved', memory)
+  const res = await request('/memories', {
+    method: 'POST',
+    body: { type: 'text', content: content.value },
+  })
+  loading.value = false
+  if (res.success && res.data) {
+    emit('saved', res.data)
     emit('close')
-  } catch (e: any) {
-    error.value = e?.data?.message ?? 'Failed to save memory.'
-  } finally {
-    loading.value = false
+  } else {
+    error.value = res.message ?? 'Failed to save memory.'
   }
 }
 </script>

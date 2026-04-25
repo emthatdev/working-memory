@@ -166,11 +166,11 @@ const memoryCards = computed<MemoryCard[]>(() =>
   }))
 )
 
-const { data, error } = await useAsyncData('memories', () =>
+const { data } = await useAsyncData('memories', () =>
   request<Memory[]>('/memories')
 )
 
-if (data.value) memories.value = data.value
+if (data.value?.success) memories.value = data.value.data ?? []
 
 function selectMemory(card: MemoryCard) {
   selected.value = card.memory
@@ -180,16 +180,12 @@ async function runSearch() {
   const q = searchQuery.value.trim()
   if (!q) return
   searching.value = true
-  try {
-    searchResults.value = await request<Memory[]>('/memories/search', {
-      method: 'POST',
-      body: { query: q },
-    })
-  } catch {
-    searchResults.value = []
-  } finally {
-    searching.value = false
-  }
+  const res = await request<Memory[]>('/memories/search', {
+    method: 'POST',
+    body: { query: q },
+  })
+  searching.value = false
+  searchResults.value = res.success ? (res.data ?? []) : []
 }
 
 function focusResult(r: Memory) {
@@ -211,7 +207,7 @@ function formatDate(iso: string) {
 }
 
 async function logout() {
-  try { await request('/logout', { method: 'POST' }) } catch {}
+  await request('/logout', { method: 'POST' })
   auth.logout()
   router.push('/')
 }

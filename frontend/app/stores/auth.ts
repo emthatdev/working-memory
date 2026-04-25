@@ -13,5 +13,25 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
   }
 
-  return { token, user, isAuthenticated, setAuth, logout }
+  async function loadUser() {
+    if (!token.value) return
+    const config = useRuntimeConfig()
+    try {
+      const data = await $fetch<Record<string, any>>(
+        `${config.public.apiUrl}/api/user`,
+        {
+          headers: {
+            Authorization: `Bearer ${token.value}`,
+            Accept: 'application/json',
+          },
+          credentials: 'include',
+        },
+      )
+      user.value = data
+    } catch {
+      logout()
+    }
+  }
+
+  return { token, user, isAuthenticated, setAuth, logout, loadUser }
 })

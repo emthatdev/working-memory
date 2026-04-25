@@ -63,28 +63,29 @@ const form = reactive({
 async function submit() {
   error.value = ''
   loading.value = true
-  try {
-    const path = mode.value === 'login' ? '/login' : '/register'
-    const body: Record<string, string> = {
-      email: form.email,
-      password: form.password,
-    }
-    if (mode.value === 'register') {
-      body.name = form.name
-      body.password_confirmation = form.password_confirmation
-    }
 
-    const res = await request<{ token: string; user: Record<string, any> }>(path, {
-      method: 'POST',
-      body,
-    })
+  const path = mode.value === 'login' ? '/login' : '/register'
+  const body: Record<string, string> = {
+    email: form.email,
+    password: form.password,
+  }
+  if (mode.value === 'register') {
+    body.name = form.name
+    body.password_confirmation = form.password_confirmation
+  }
 
-    auth.setAuth(res.token, res.user)
+  const res = await request<{ token: string; user: Record<string, any> }>(path, {
+    method: 'POST',
+    body,
+  })
+
+  loading.value = false
+
+  if (res.success && res.data) {
+    auth.setAuth(res.data.token, res.data.user)
     await navigateTo('/canvas')
-  } catch (e: any) {
-    error.value = e?.data?.message ?? 'Something went wrong.'
-  } finally {
-    loading.value = false
+  } else {
+    error.value = res.message ?? 'Something went wrong.'
   }
 }
 </script>
