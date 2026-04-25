@@ -436,7 +436,15 @@ function onWheel(e: WheelEvent) {
 onMounted(async () => {
   const res = await request<Memory[]>('/memories')
   if (res.success) {
-    memoryCards.value = (res.data ?? []).map(buildCard)
+    const cards = (res.data ?? []).map(buildCard)
+    memoryCards.value = cards
+
+    // Center the camera on the actual centroid of all cards so no
+    // dragging is needed to find them regardless of their ID distribution.
+    if (cards.length > 0) {
+      cam.x = cards.reduce((s, c) => s + c.position[0], 0) / cards.length
+      cam.y = cards.reduce((s, c) => s + c.position[1], 0) / cards.length
+    }
   }
   raf = requestAnimationFrame(tick)
 })
