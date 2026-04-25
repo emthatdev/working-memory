@@ -101,6 +101,16 @@
 
     <ChatPanel :open="chatOpen" @close="chatOpen = false" />
     <UploadModal :open="uploadOpen" @close="uploadOpen = false" @saved="onMemorySaved" />
+
+    <!-- Loading overlay — blocks interaction until memories are fetched -->
+    <Transition name="fade-out">
+      <div v-if="loading" class="loading-overlay">
+        <div class="loading-card">
+          <div class="spinner" />
+          <p class="loading-label">Loading your memory palace…</p>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -170,6 +180,7 @@ const FADE_END   = 36
 // Vue reactive state
 // ---------------------------------------------------------------------------
 const memoryCards   = ref<MemoryCard[]>([])
+const loading       = ref(true)
 const hoveredId     = ref<number | null>(null)
 const selected      = ref<Memory | null>(null)
 const chatOpen      = ref(false)
@@ -439,13 +450,12 @@ onMounted(async () => {
     const cards = (res.data ?? []).map(buildCard)
     memoryCards.value = cards
 
-    // Center the camera on the actual centroid of all cards so no
-    // dragging is needed to find them regardless of their ID distribution.
     if (cards.length > 0) {
       cam.x = cards.reduce((s, c) => s + c.position[0], 0) / cards.length
       cam.y = cards.reduce((s, c) => s + c.position[1], 0) / cards.length
     }
   }
+  loading.value = false
   raf = requestAnimationFrame(tick)
 })
 
@@ -632,4 +642,33 @@ async function logout() {
 
 .pop-enter-active, .pop-leave-active { transition: opacity 0.2s, transform 0.2s; }
 .pop-enter-from, .pop-leave-to { opacity: 0; transform: scale(0.96); }
+
+/* Loading overlay */
+.loading-overlay {
+  position: fixed; inset: 0;
+  z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg);
+  /* Prevent any interaction with the canvas beneath */
+  pointer-events: all;
+}
+.loading-card {
+  display: flex; flex-direction: column; align-items: center; gap: 1.25rem;
+}
+.spinner {
+  width: 36px; height: 36px;
+  border: 2.5px solid rgba(124, 58, 237, 0.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-label {
+  font-size: 0.9375rem;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+
+.fade-out-leave-active { transition: opacity 0.4s ease; }
+.fade-out-leave-to { opacity: 0; }
 </style>
