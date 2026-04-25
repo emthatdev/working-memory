@@ -1,0 +1,22 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #05030f;
+  --surface:  #0f0a2a;
+  --border:   #2a1f6a;
+  --accent:   #7c3aed;
+  --accent2:  #6366f1;
+  --text:     #e2e0ff;
+  --muted:    #6b63a8;
+  --danger:   #f43f5e;
+  --radius:   12px;
+  --glass:    rgba(15, 10, 42, 0.75);
+}
+
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; }
+
+input, textarea, select, button { font-family: inherit; }
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
