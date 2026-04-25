@@ -233,9 +233,9 @@ function rand(seed: number, salt: number): number {
 }
 function cardPosition(id: number, zBias = 0): [number, number, number] {
   return [
-    (rand(id, 0) - 0.5) * 44,
-    (rand(id, 1) - 0.5) * 26,
-    zBias + (rand(id, 2) - 0.5) * 8,
+    (rand(id, 0) - 0.5) * 24,
+    (rand(id, 1) - 0.5) * 16,
+    zBias + (rand(id, 2) - 0.5) * 6,
   ]
 }
 function cardRotation(id: number): [number, number, number] {
@@ -628,8 +628,9 @@ function focusResult(r: Memory) {
 }
 
 function onMemorySaved(memory: Memory) {
-  // Newly saved memory is the most recent — place it at the front layer
-  memoryCards.value.unshift(buildCard(memory, 8))
+  const card = buildCard(memory, 8)
+  memoryCards.value.unshift(card)
+  selectMemory(card)
 }
 
 function truncate(s: string, n: number) { return s.length > n ? s.slice(0, n) + '…' : s }
