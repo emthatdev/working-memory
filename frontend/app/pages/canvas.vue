@@ -165,6 +165,7 @@ function setGroupRef(id: number, el: unknown) { el ? groupMap.set(id, el as Grou
 // Camera state (plain objects — no Vue reactivity overhead per frame)
 // ---------------------------------------------------------------------------
 const cam = { x: 0, y: 0, z: 22 }      // actual camera world position
+let camTargetZ = 22                     // zoom target; lerped toward each frame
 const vel = { x: 0, y: 0 }             // current velocity
 const targetVel = { x: 0, y: 0 }       // desired velocity (decays each frame)
 
@@ -333,6 +334,9 @@ function tick() {
     cam.y += vel.y
   }
 
+  // Smooth zoom — same lerp handles both the intro animation and wheel zoom
+  cam.z = lerp(cam.z, camTargetZ, 0.06)
+
   // Push to Three.js camera directly (no Vue reactive overhead per-frame)
   const camera = cameraRef.value
   if (camera?.position) {
@@ -431,8 +435,8 @@ function onPointerUp(e: PointerEvent) {
 
 function onWheel(e: WheelEvent) {
   if (e.ctrlKey) {
-    // Pinch zoom / Ctrl+scroll → move along Z
-    cam.z = Math.max(5, Math.min(80, cam.z + e.deltaY * 0.04))
+    // Pinch zoom / Ctrl+scroll → update target, tick loop lerps cam.z toward it
+    camTargetZ = Math.max(5, Math.min(80, camTargetZ + e.deltaY * 0.04))
   } else {
     // Trackpad two-finger pan or mouse wheel scroll → pan XY
     const scale = cam.z * 0.001
@@ -455,6 +459,9 @@ onMounted(async () => {
       cam.y = cards.reduce((s, c) => s + c.position[1], 0) / cards.length
     }
   }
+  // Start the camera far out; camTargetZ stays at 22 so tick lerps it in
+  cam.z = 80
+  camTargetZ = 22
   loading.value = false
   raf = requestAnimationFrame(tick)
 })
