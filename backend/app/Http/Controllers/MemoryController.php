@@ -19,6 +19,15 @@ class MemoryController extends Controller
         private GeminiService $gemini,
     ) {}
 
+    public function index(\Illuminate\Http\Request $request): JsonResponse
+    {
+        $memories = Memory::where('user_id', $request->user()->id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json($memories);
+    }
+
     public function store(StoreMemoryRequest $request): JsonResponse
     {
         $type     = $request->input('type');

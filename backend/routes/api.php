@@ -13,6 +13,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', fn (Request $request) => $request->user());
 
+    Route::get('/memories', [MemoryController::class, 'index']);
     Route::post('/memories', [MemoryController::class, 'store']);
     Route::post('/memories/search', [MemoryController::class, 'search']);
 
