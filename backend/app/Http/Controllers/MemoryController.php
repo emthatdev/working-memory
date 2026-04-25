@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\SearchMemoryRequest;
 use App\Http\Requests\StoreMemoryRequest;
 use App\Models\Memory;
 use App\Services\ClaudeService;
@@ -58,6 +59,14 @@ class MemoryController extends Controller
         });
 
         return response()->json($memory, 201);
+    }
+
+    public function search(SearchMemoryRequest $request): JsonResponse
+    {
+        $embedding = $this->gemini->embed($request->input('query'));
+        $results   = Memory::semanticSearch($request->user()->id, $embedding);
+
+        return response()->json($results);
     }
 
     private function storeAndExtractImage(StoreMemoryRequest $request, ?string &$filePath): string
