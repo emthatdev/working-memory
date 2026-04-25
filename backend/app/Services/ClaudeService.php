@@ -52,4 +52,22 @@ class ClaudeService
 
         return $data['content'][0]['text'];
     }
+
+    public function message(string $system, string $userMessage): string
+    {
+        $response = $this->client->post('/v1/messages', [
+            'json' => [
+                'model'      => 'claude-sonnet-4-20250514',
+                'max_tokens' => 2048,
+                'system'     => $system,
+                'messages'   => [
+                    ['role' => 'user', 'content' => $userMessage],
+                ],
+            ],
+        ]);
+
+        $data = json_decode($response->getBody()->getContents(), true);
+
+        return $data['content'][0]['text'];
+    }
 }

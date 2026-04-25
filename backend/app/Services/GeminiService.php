@@ -32,4 +32,23 @@ class GeminiService
 
         return $data['embedding']['values'];
     }
+
+    public function chat(string $system, string $userMessage): string
+    {
+        $response = $this->client->post('/v1beta/models/gemini-2.5-flash:generateContent', [
+            'query' => ['key' => config('services.gemini.key')],
+            'json'  => [
+                'systemInstruction' => [
+                    'parts' => [['text' => $system]],
+                ],
+                'contents' => [
+                    ['role' => 'user', 'parts' => [['text' => $userMessage]]],
+                ],
+            ],
+        ]);
+
+        $data = json_decode($response->getBody()->getContents(), true);
+
+        return $data['candidates'][0]['content']['parts'][0]['text'];
+    }
 }
