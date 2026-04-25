@@ -368,22 +368,40 @@ function tick() {
 // ---------------------------------------------------------------------------
 // Pointer + wheel navigation
 // ---------------------------------------------------------------------------
-let isDragging = false
-let lastPtr = { x: 0, y: 0 }
+// Pointer capture is deferred until the drag crosses a pixel threshold.
+// Below the threshold the canvas element receives the normal click event,
+// so TresJS's raycaster fires and @click on TresMesh works correctly.
+const DRAG_THRESHOLD = 5 // px
+let isDragging  = false
+let captured    = false
+let lastPtr     = { x: 0, y: 0 }
+let startPtr    = { x: 0, y: 0 }
 
 function onPointerDown(e: PointerEvent) {
-  // Don't hijack clicks on HTML UI elements
   if ((e.target as Element).closest('header, button, input, form, .detail-card, .panel')) return
-  isDragging = true
-  lastPtr = { x: e.clientX, y: e.clientY }
-  ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
+  isDragging = false
+  captured   = false
+  lastPtr    = { x: e.clientX, y: e.clientY }
+  startPtr   = { x: e.clientX, y: e.clientY }
 }
 
 function onPointerMove(e: PointerEvent) {
-  if (!isDragging) return
+  if (startPtr.x === 0 && startPtr.y === 0) return
   const dx = e.clientX - lastPtr.x
   const dy = e.clientY - lastPtr.y
-  // Pan speed scales with zoom depth so movement feels consistent at any zoom
+
+  // Engage drag only after the pointer has moved enough to be intentional
+  if (!isDragging) {
+    const totalDx = e.clientX - startPtr.x
+    const totalDy = e.clientY - startPtr.y
+    if (Math.sqrt(totalDx * totalDx + totalDy * totalDy) < DRAG_THRESHOLD) return
+    isDragging = true
+    // Capture now so fast drags don't escape the element
+    if (!captured) {
+      try { (e.currentTarget as Element).setPointerCapture(e.pointerId); captured = true } catch { /* noop */ }
+    }
+  }
+
   const scale = cam.z * 0.0014
   targetVel.x -= dx * scale
   targetVel.y += dy * scale
@@ -391,10 +409,12 @@ function onPointerMove(e: PointerEvent) {
 }
 
 function onPointerUp(e: PointerEvent) {
-  if (isDragging) {
+  if (captured) {
     try { (e.currentTarget as Element).releasePointerCapture(e.pointerId) } catch { /* noop */ }
   }
   isDragging = false
+  captured   = false
+  startPtr   = { x: 0, y: 0 }
   // intentionally do NOT zero velocity — let inertia carry through
 }
 
