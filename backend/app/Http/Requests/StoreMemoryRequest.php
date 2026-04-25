@@ -18,6 +18,7 @@ class StoreMemoryRequest extends FormRequest
             'type'    => ['required', 'in:text,image,pdf'],
             'content' => ['required_if:type,text', 'nullable', 'string'],
             'file'    => ['required_if:type,image,pdf', 'nullable', 'file', 'mimes:jpg,jpeg,png,gif,webp,pdf', 'max:20480'],
+            'note'    => ['nullable', 'string', 'max:2000'],
         ];
     }
 }

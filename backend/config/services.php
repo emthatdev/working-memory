@@ -43,4 +43,10 @@ return [
         'key' => env('GEMINI_API_KEY'),
     ],
 
+    'supabase' => [
+        'url'            => env('SUPABASE_URL'),
+        'service_key'    => env('SUPABASE_SERVICE_KEY'),
+        'storage_bucket' => env('SUPABASE_STORAGE_BUCKET', 'memories'),
+    ],
+
 ];

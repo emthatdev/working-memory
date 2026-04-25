@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Http\Requests\SearchMemoryRequest;
 use App\Http\Requests\StoreMemoryRequest;
 use App\Models\Memory;
-use App\Services\ClaudeService;
 use App\Services\GeminiService;
+use App\Services\SupabaseStorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -15,8 +15,8 @@ use Smalot\PdfParser\Parser as PdfParser;
 class MemoryController extends Controller
 {
     public function __construct(
-        private ClaudeService $claude,
         private GeminiService $gemini,
+        private SupabaseStorageService $supabaseStorage,
     ) {}
 
     public function index(\Illuminate\Http\Request $request): JsonResponse
@@ -40,22 +40,30 @@ class MemoryController extends Controller
             'pdf'   => $this->storeAndExtractPdf($request, $filePath),
         };
 
+        // For images, append any user-supplied note to enrich the embedding
+        $note             = $type === 'image' ? trim($request->input('note', '')) : null;
+        $textForEmbedding = ($note) ? $extractedText . "\n\n" . $note : $extractedText;
+
         // 2. Generate embedding before touching the DB; clean up file on failure
         try {
-            $embedding = $this->gemini->embed($extractedText);
+            $embedding = $this->gemini->embed($textForEmbedding);
         } catch (\Throwable $e) {
             if ($filePath) {
-                Storage::disk('local')->delete($filePath);
+                if ($type === 'image') {
+                    $this->supabaseStorage->delete($filePath);
+                } else {
+                    Storage::disk('local')->delete($filePath);
+                }
             }
             throw $e;
         }
 
         // 3. Persist atomically — record creation + embedding in one transaction
-        $memory = DB::transaction(function () use ($request, $type, $filePath, $embedding) {
+        $memory = DB::transaction(function () use ($request, $type, $filePath, $embedding, $note) {
             $memory = Memory::create([
                 'user_id'   => $request->user()->id,
                 'type'      => $type,
-                'content'   => $type === 'text' ? $request->input('content') : null,
+                'content'   => $type === 'text' ? $request->input('content') : ($note ?: null),
                 'file_path' => $filePath,
             ]);
 
@@ -80,12 +88,14 @@ class MemoryController extends Controller
 
     private function storeAndExtractImage(StoreMemoryRequest $request, ?string &$filePath): string
     {
-        $file     = $request->file('file');
-        $filePath = $file->store('memories/images', 'local');
-        $mimeType = $file->getMimeType();
-        $base64   = base64_encode(Storage::disk('local')->get($filePath));
+        $file      = $request->file('file');
+        $contents  = file_get_contents($file->getRealPath());
+        $mimeType  = $file->getMimeType();
+        $extension = $file->getClientOriginalExtension();
 
-        return $this->claude->extractTextFromImage($base64, $mimeType);
+        $filePath = $this->supabaseStorage->upload($contents, $mimeType, $extension);
+
+        return $this->gemini->extractTextFromImage(base64_encode($contents), $mimeType);
     }
 
     private function storeAndExtractPdf(StoreMemoryRequest $request, ?string &$filePath): string

@@ -48,7 +48,10 @@
     <!-- Top bar -->
     <header class="topbar">
       <span class="logo">Loci OS</span>
-      <button class="btn-ghost" @click="logout">Sign out</button>
+      <div class="topbar-actions">
+        <button class="btn-ghost" @click="resetCamera">Reset view</button>
+        <button class="btn-ghost" @click="logout">Sign out</button>
+      </div>
     </header>
 
     <!-- Search bar -->
@@ -117,6 +120,7 @@
 <script setup lang="ts">
 import {
   CanvasTexture,
+  TextureLoader,
   type Mesh,
   type Group,
   type PerspectiveCamera,
@@ -168,6 +172,9 @@ const cam = { x: 0, y: 0, z: 22 }      // actual camera world position
 let camTargetZ = 22                     // zoom target; lerped toward each frame
 const vel = { x: 0, y: 0 }             // current velocity
 const targetVel = { x: 0, y: 0 }       // desired velocity (decays each frame)
+
+// Home view — stored after mount, used by resetCamera()
+let initialView = { x: 0, y: 0, z: 22 }
 
 // Fly-to state — set by selectMemory(), cleared once FLY_DURATION elapses
 let flyTarget: { x: number; y: number; z: number } | null = null
@@ -306,7 +313,26 @@ function makeTexture(memory: Memory): CanvasTexture {
   ctx.fillStyle = '#d4c8f0'
   ctx.font = '15px system-ui,sans-serif'
   ctx.textAlign = 'left'; ctx.textBaseline = 'top'
-  wrapText(ctx, memory.content ?? memory.file_path ?? '(no content)', 18, 60, W - 36, 26, 8)
+
+  if (memory.type === 'image') {
+    // Placeholder — real image texture is swapped in by buildCard
+    const cx = W / 2, cy = H / 2 + 10
+    ctx.strokeStyle = color + '60'
+    ctx.lineWidth = 2
+    ctx.beginPath(); ctx.roundRect(cx - 44, cy - 32, 88, 64, 6); ctx.stroke()
+    // mountains
+    ctx.fillStyle = color + '50'
+    ctx.beginPath()
+    ctx.moveTo(cx - 36, cy + 28); ctx.lineTo(cx - 8, cy - 8); ctx.lineTo(cx + 14, cy + 28)
+    ctx.fill()
+    ctx.beginPath()
+    ctx.moveTo(cx, cy + 28); ctx.lineTo(cx + 22, cy - 2); ctx.lineTo(cx + 44, cy + 28)
+    ctx.fill()
+    // sun
+    ctx.beginPath(); ctx.arc(cx + 26, cy - 14, 9, 0, Math.PI * 2); ctx.fill()
+  } else {
+    wrapText(ctx, memory.content ?? memory.file_path ?? '(no content)', 18, 60, W - 36, 26, 8)
+  }
 
   ctx.fillStyle = color + 'aa'
   ctx.font = '11px system-ui,sans-serif'
@@ -317,7 +343,7 @@ function makeTexture(memory: Memory): CanvasTexture {
 }
 
 function buildCard(memory: Memory, zBias = 0): MemoryCard {
-  return {
+  const card: MemoryCard = {
     id: memory.id,
     position: cardPosition(memory.id, zBias),
     rotation: cardRotation(memory.id),
@@ -325,6 +351,32 @@ function buildCard(memory: Memory, zBias = 0): MemoryCard {
     texture: makeTexture(memory),
     memory,
   }
+
+  if (memory.type === 'image' && memory.file_path) {
+    new TextureLoader().load(memory.file_path, (texture) => {
+      // Crop-to-fit: maintain aspect ratio without letterboxing
+      const imageAspect = texture.image.naturalWidth / texture.image.naturalHeight
+      const cardAspect  = 3.2 / 2
+      if (imageAspect > cardAspect) {
+        texture.repeat.set(cardAspect / imageAspect, 1)
+        texture.offset.set((1 - cardAspect / imageAspect) / 2, 0)
+      } else {
+        texture.repeat.set(1, imageAspect / cardAspect)
+        texture.offset.set(0, (1 - imageAspect / cardAspect) / 2)
+      }
+      texture.needsUpdate = true
+      card.texture.dispose()
+      card.texture = texture
+      const mesh = meshMap.get(memory.id)
+      if (mesh) {
+        const mat = mesh.material as MeshBasicMaterial
+        mat.map = texture
+        mat.needsUpdate = true
+      }
+    })
+  }
+
+  return card
 }
 
 // ---------------------------------------------------------------------------
@@ -515,6 +567,8 @@ onMounted(async () => {
       cam.y = latest.position[1]
       camTargetZ = latest.position[2] + 8
     }
+    // Store settled position so resetCamera() can fly back here
+    initialView = { x: cam.x, y: cam.y, z: camTargetZ }
   }
   // Start far back on the same XY axis — tick lerps cam.z toward camTargetZ
   cam.z = 80
@@ -546,6 +600,13 @@ function triggerPulse(ids: number[]) {
   for (const id of ids) { citedIds.add(id); pulseStart.set(id, now) }
 }
 
+function resetCamera() {
+  vel.x = 0; vel.y = 0; targetVel.x = 0; targetVel.y = 0
+  flyTarget    = { ...initialView }
+  pendingSelect = null
+  flyStartTime  = performance.now()
+}
+
 async function runSearch() {
   const q = searchQuery.value.trim()
   if (!q) return
@@ -556,9 +617,14 @@ async function runSearch() {
 }
 
 function focusResult(r: Memory) {
-  selected.value = r
   searchResults.value = []
   searchQuery.value = ''
+  const card = memoryCards.value.find(c => c.id === r.id)
+  if (card) {
+    selectMemory(card)
+  } else {
+    selected.value = r
+  }
 }
 
 function onMemorySaved(memory: Memory) {
@@ -602,6 +668,7 @@ async function logout() {
   background: linear-gradient(135deg, #a78bfa, #6366f1);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
 }
+.topbar-actions { display: flex; gap: 0.5rem; align-items: center; }
 .btn-ghost {
   background: none; border: 1px solid var(--border); color: var(--muted);
   border-radius: 8px; padding: 0.4rem 1rem; font-size: 0.8125rem;

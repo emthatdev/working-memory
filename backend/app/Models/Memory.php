@@ -17,7 +17,7 @@ class Memory extends Model
         return $this->belongsTo(User::class);
     }
 
-    public static function semanticSearch(int $userId, array $embedding, int $limit = 5): array
+    public static function semanticSearch(int $userId, array $embedding, int $limit = 5, float $threshold = 0.6): array
     {
         $vectorLiteral = json_encode(array_map('floatval', $embedding));
 
@@ -26,9 +26,10 @@ class Memory extends Model
                     1 - (embedding <=> '{$vectorLiteral}'::vector) AS similarity
              FROM memories
              WHERE user_id = ?
+               AND 1 - (embedding <=> '{$vectorLiteral}'::vector) > ?
              ORDER BY embedding <=> '{$vectorLiteral}'::vector
              LIMIT ?",
-            [$userId, $limit]
+            [$userId, $threshold, $limit]
         );
     }
 }
